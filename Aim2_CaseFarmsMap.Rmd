@@ -1,0 +1,110 @@
+---
+title: "RVF Aim 2 Case Farms and Control Regions"
+author: "Carson Telford"
+date: "2025-09-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tmap)
+library(sf)
+library(tidyverse)
+library(readxl)
+
+tmap_mode('view')
+
+ug_adm0 <- st_read("C:/Users/carso/OneDrive - University of North Carolina at Chapel Hill/Dissertation/uganda_shapefiles/uga_admbnda_adm0_ubos_20200824.shp")
+
+
+ug_adm2 <- st_read("C:/Users/carso/OneDrive - University of North Carolina at Chapel Hill/Dissertation/uganda_shapefiles/uga_admbnda_adm2_ubos_20200824.shp")
+
+ug_adm4 <- st_read("C:/Users/carso/OneDrive - University of North Carolina at Chapel Hill/Dissertation/uganda_shapefiles/uga_admbnda_adm4_ubos_20200824.shp")
+
+ug_adm4 <- ug_adm4 %>%
+  st_make_valid()
+
+
+casefarms <- read_excel("C:/Users/carso/OneDrive - University of North Carolina at Chapel Hill/Dissertation/RVFdata/AIM2_HOMESTEADS_FINAL.xlsx")
+
+casefarms <- casefarms %>%
+  distinct(HomesteadID_casefarms, .keep_all=T)
+
+
+# Spatial join of case farms to subdistricts
+casefarms_sf <- st_as_sf(casefarms, coords = c("Longitude_case", "Latitude_case"), crs = st_crs(ug_adm4))  # make sure crs matches
+plot(casefarms_sf$geometry)
+
+farm_counts <- casefarms_sf %>%
+  st_join(ug_adm4, join = st_within) %>%  # attach polygon info to points
+  st_drop_geometry() %>%                  # remove geometry to just keep data
+  group_by(ADM4_EN) %>%                   # or whatever column identifies your polygon
+  summarise(farms_in_polygon = n())
+
+ug_adm4 <- ug_adm4 %>%
+  left_join(farm_counts, by = "ADM4_EN") %>%
+  mutate(OutbreakFarms = replace_na(farms_in_polygon, 0)) %>%
+  mutate(RequiredControlFarms = OutbreakFarms*2)
+
+# create 3km buffers around case farms
+casefarms_sf_utm <- st_transform(casefarms_sf, crs = 32636)
+casefarms_bufferutm <- st_buffer(casefarms_sf_utm, dist = 2000)  # 2000 meters = 2 km
+plot(st_geometry(casefarms_bufferutm))
+
+casefarms_buffer3km <- st_transform(casefarms_bufferutm, crs = 4326)
+st_crs(casefarms_buffer3km)
+plot(st_geometry(casefarms_buffer3km))
+
+  
+```
+
+## Case Homesteads Map
+
+This map visualizes homesteads in Uganda that reported a RVF infection, along with corresponding subdistrict borders. 
+
+The goal of our study is to evaluate factors that may increase the risk of RVF infections occurring at homesteads with livestock. Most human RVF infections are a result of contact with infected livestock.
+
+In order to conduct our study, we must identify homesteads that did *not* report a RVF infection, but yet are still similar to case homesteads in the number and species of livestock.
+
+We must select 2 "control" homesteads for each "case" homestead. These control homesteads must correspond to the same subdistrict, but not fall within 3 kilometers of a case homestead. Blue dots represent case homesteads, and red buffers with a radius of 3 kilometers have been placed around each case homestead to represent the area in which control homesteads *cannot* be selected. 
+
+We would like the control and case homesteads to match according to livestock species (cattle, sheep/goats), count (0, 1-10, 11-50, >50), and breed (local, exotic). 
+
+
+#### Request:
+*For each case farm in your subdistrict, please provide of the coordinates of 2 farms with similar characteristics that are outside of the red buffer.*
+
+You may click on subdistricts and buffers to see information about the number of case farms, number of control farms required, district, and subdistrict names.
+
+```{r cars, echo=F, fig.width=10, fig.height=7}
+
+tmap_options(check.and.fix = TRUE)
+
+tm_basemap("Esri.WorldImagery") +             # satellite basemap
+  tm_tiles("CartoDB.PositronOnlyLabels") +    # overlay labels
+
+  # ADM4: click popup
+  tm_shape(ug_adm4) +
+  tm_polygons(col = "white",alpha=0, lwd = .6,id=NULL, 
+              border.col = 'white',
+              popup.vars = c("ADM2_EN","ADM4_EN","OutbreakFarms")) + # light gray borders
+
+  # ADM0: no fill, just thick border
+  tm_shape(ug_adm0) +
+  tm_borders(col = "black", lwd = 2, alpha = 1) + 
+  
+  # 3 km buffers on top
+  tm_shape(casefarms_buffer3km) +
+  tm_polygons(col = "red", alpha = 0.2, border.col = "red", lwd = 1,
+              popup.vars = c("Year","HomesteadID_casefarms", "S.No")) +
+  
+  # Original farm points on top
+  tm_shape(casefarms_sf) +
+  tm_dots(col = "blue", size = 0.07, popup.vars = c("Year", "HomesteadID_casefarms",
+                                                    "S.No")) 
+
+
+```
+
+
