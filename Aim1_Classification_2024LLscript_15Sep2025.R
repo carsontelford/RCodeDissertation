@@ -228,7 +228,7 @@ training_datamerge <- training_datamerge %>%
   left_join(centsf)
 
 
-# Sample down dominant class (ground crops, class 2)
+# Sample down ultra dominant classes (ground crops, bush)
 class4 <- training_datamerge %>% filter(class == "class4") %>% sample_frac(0.75)
 class6 <- training_datamerge %>% filter(class == "class6") %>% sample_frac(0.85)
 others <- training_datamerge %>% filter(!class %in% c("class4","class6"))
@@ -236,7 +236,6 @@ table(others$class)
 training_datamerge2 <- bind_rows(class4,class6, others)
 table(training_datamerge2$class)
 prop.table(table(training_datamerge2$class))
-
 cat("Step 5: Resampled dominant classes\n")
 
 #### Split into train/test ####
