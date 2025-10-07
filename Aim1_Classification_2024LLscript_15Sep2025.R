@@ -103,7 +103,7 @@ cat("Step 1: Terra tempdir set to", Sys.getenv("TMPDIR"), "\n")
 # gc()
 # 
 # # save the stack
-# rstack_file <- file.path(stack_folder, "rstack_Aggx2.tif")
+# rstack_file <- file.path(stack_folder, "rstack_Aggx2_2024.tif")
 # writeRaster(
 #   rstack,
 #   rstack_file,
@@ -119,7 +119,8 @@ cat("Step 1: Terra tempdir set to", Sys.getenv("TMPDIR"), "\n")
 #### Load precomputed stack ####
 myrstack_file <- list.files(stack_folder, pattern = "*.tif$", full.names = TRUE)
 myrstack_file
-rstack <- rast(myrstack_file)
+specificfile <- myrstack_file[grepl("2024", myrstack_file)]
+rstack <- rast(specificfile)
 names(rstack)
 
 
@@ -229,7 +230,7 @@ training_datamerge <- training_datamerge %>%
 
 
 # Sample down ultra dominant classes (ground crops, bush)
-class4 <- training_datamerge %>% filter(class == "class4") %>% sample_frac(0.75)
+class4 <- training_datamerge %>% filter(class == "class4") %>% sample_frac(0.7)
 class6 <- training_datamerge %>% filter(class == "class6") %>% sample_frac(0.85)
 others <- training_datamerge %>% filter(!class %in% c("class4","class6"))
 table(others$class)
@@ -237,6 +238,23 @@ training_datamerge2 <- bind_rows(class4,class6, others)
 table(training_datamerge2$class)
 prop.table(table(training_datamerge2$class))
 cat("Step 5: Resampled dominant classes\n")
+
+
+
+# assess correlation 
+colnames(training_datamerge2)
+cordf <- training_datamerge2 %>%
+  dplyr::select(B11,B12,B2,B3,B4,B5,B6,B7,B8,B8A, 
+                NDVI_SD,
+                B11focal, B12focal, B2focal, B3focal,
+                B4focal, B5focal, B6focal, B8focal,
+                NDVIfocal, NDVISDfocal,
+                B4focalSD, B8focalSD,
+                NDVIdryfocal, NDVIwetfocal,
+                B5dryfocal, B5wetfocal)
+cordfout <- data.frame(cor(cordf))
+write.csv(cordfout, file.path(output_folder, "cordfout.csv"))
+
 
 #### Split into train/test ####
 #' going to assign to train/test by polygon ID
@@ -364,12 +382,12 @@ train_ctrl <- trainControl(
 
 # XGBoost tuning grid
 xgb_grid <- expand.grid(
-  nrounds = c(800,1000,1200, 1400),        # number of boosting rounds
-  max_depth = c(4,5),
-  eta = c(.07, .08, .09),          # learning rate
-  gamma = c(2,4),
+  nrounds = c(800),        # number of boosting rounds
+  max_depth = c(4),
+  eta = c(.08),          # learning rate
+  gamma = c(4),
   colsample_bytree = c(.6),
-  min_child_weight = c(1,3),
+  min_child_weight = c(3),
   subsample = c(.5)
 )
 
@@ -382,7 +400,7 @@ xgb_model <- train(
   tuneGrid = xgb_grid,
   objective = "multi:softprob",   # multiclass
   num_class = length(levels(Y)),
-  metric = "CropF1_weight",  # Use custom metric for optimization
+  metric = "CropF1",  # Use custom metric for optimization
   maximize = TRUE      # Explicitly maximize the F1 score
 )
 

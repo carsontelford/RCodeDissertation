@@ -10,10 +10,9 @@ library(tidyverse)
 
 
 #### All bands ####
-##### 2024 #####
 
 # function to merge and write rasters for a given band + year
-process_band <- function(band, year, outdir = "Aim 1/GEE_RawImageryBands") {
+process_band <- function(band, year, outdir = "Aim 1/GEE_RawImageryBands/2016") {
   indir <- outdir   # remove year subfolder
   
   # build regex pattern
@@ -43,21 +42,33 @@ process_band <- function(band, year, outdir = "Aim 1/GEE_RawImageryBands") {
 
 # ---- run for multiple bands/years ----
 bands_years <- list(
-  c("B5_dry",   "2022"),
-  c("NDVI_dry", "2022"),
-  c("NDVI_wet", "2022"),
-  c("B5_wet",   "2022")
+  c("B2",   "2016"),
+  c("B3",   "2016"),
+  c("B4",   "2016"),
+  c("B5",   "2016"),
+  c("B6",   "2016"),
+  c("B7",   "2016"),
+  c("B8",   "2016"),
+  c("B8A",  "2016"),
+  c("B11",  "2016"),
+  c("B12",  "2016"),
+  c("NDVI",  "2016"),
+  c("NDVI_SD",  "2016"),
+  c("NDVI_dry",  "2016"),
+  c("NDVI_wet",  "2016"),
+  c("B5_dry", "2016"),
+  c("B5_wet", "2016")
 )
 
-list.files("Aim 1/GEE_RawImageryBands", pattern = "\\.tif$")
+list.files("Aim 1/GEE_RawImageryBands/2016", pattern = "\\.tif$")
 
 # loop through and process
 lapply(bands_years, function(x) process_band(x[1], x[2]))
 
 
-
-t <- rast("Aim 1/GEE_RawImageryBands/2023/final_B3_float32_compressed.tif")
+t <- rast("Aim 1/GEE_RawImageryBands/2018/final_B11_float32_compressed.tif")
 plot(t)
+
 
 
 

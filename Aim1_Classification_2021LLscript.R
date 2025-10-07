@@ -1,18 +1,7 @@
-
-trainclass <- readRDS("C:/Users/carso/Downloads/cm_collapsed_trainconfusionmatrix.rds")
-testclass <- readRDS("C:/Users/carso/Downloads/cm_collapsed_testconfusionmatrix.rds")
-trainclass
-testclass
-
-trainraw <- readRDS("C:/Users/carso/Downloads/cm_raw_trainconfusionmatrix.rds")
-testraw <- readRDS("C:/Users/carso/Downloads/cm_raw_testconfusionmatrix.rds")
-trainraw
-testraw
-
-varimp <- readRDS("C:/Users/carso/Downloads/varImportance.rds")
-varimp
-
 #### Top ####
+
+# Use your personal library on Longleaf
+.libPaths("/nas/longleaf/home/ctelford/R/x86_64-pc-linux-gnu-library/4.4")
 
 # Load packages
 library(tidyverse)
@@ -27,10 +16,11 @@ library(stats)
 library(doParallel)
 
 #### Output folder (persistent, original location) ####
-output_folder <- "Aim 1/ClassificationOutput/"
-raster_folder <- "Aim 1/GEE_RawImageryBands/2021/"
-poly_folder <- "Aim 1/Shapefiles/Training Polygons/Training2016_2021/"
-stack_folder <- "Aim 1/GEE_RawImageryBands/FinalStacks/"
+output_folder <- "/users/c/t/ctelford/ClassificationOutput/Year2021/"
+raster_folder <- "/users/c/t/ctelford/Rasters/Year2021/"
+poly_folder <- "/users/c/t/ctelford/TrainingPolygons/Training2016_2021/"
+stack_folder <- "/users/c/t/ctelford/Rasters/FinalStacks/"
+
 
 dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 dir.create(raster_folder, recursive = TRUE, showWarnings = FALSE)
@@ -38,97 +28,110 @@ dir.create(poly_folder, recursive = TRUE, showWarnings = FALSE)
 dir.create(stack_folder, recursive = TRUE, showWarnings = FALSE)
 
 
-
-
 #### Terra options (fast scratch) ####
 terraOptions(
   progress = 1,
+  tempdir = Sys.getenv("TMPDIR"),  # fast, job-specific scratch
   memfrac = 0.5,
-  threads = 4
+  threads = 48
 )
 cat("Step 1: Terra tempdir set to", Sys.getenv("TMPDIR"), "\n")
 
-# #### Load raster bands ####
-# band_files <- list.files(raster_folder, pattern = "*.tif$", full.names = TRUE)
-# 
-# rstack <- rast(band_files)
-# rstack <- rstack[[1:3]]
-# rstack <- aggregate(rstack, fact=2)
-# cat("Step 2: Loaded raster stack with", nlyr(rstack), "bands\n")
-# 
-# # add focal SD layers
-# w5 <- matrix(1,5,5)  # 5x5 window
-# w7 <- matrix(1,7,7)  # 5x5 window
-# w9 <- matrix(1,9,9)  # 5x5 window
-# 
-# 
-# B11focal   <- focal(rstack$B11, w5, fun = mean,   na.policy = "omit")
-# B12focal   <- focal(rstack$B12, w5, fun = mean,   na.policy = "omit")
-# B2focal   <- focal(rstack$B2, w9, fun = mean,   na.policy = "omit")
-# B3focal   <- focal(rstack$B3, w5, fun = mean,   na.policy = "omit")
-# B4focal   <- focal(rstack$B4, w7, fun = mean,   na.policy = "omit")
-# B5focal   <- focal(rstack$B5, w9, fun = mean,   na.policy = "omit")
-# B6focal   <- focal(rstack$B6, w7, fun = mean,   na.policy = "omit")
-# B8focal   <- focal(rstack$B8, w5, fun = mean,   na.policy = "omit")
-# NDVIfocal   <- focal(rstack$NDVI, w5, fun = mean,   na.policy = "omit")
-# NDVISDfocal   <- focal(rstack$NDVI_SD, w7, fun = mean,   na.policy = "omit")
-# B4focalSD   <- focal(rstack$B4, w9, fun = sd,   na.policy = "omit")
-# B8focalSD   <- focal(rstack$B8, w7, fun = sd,   na.policy = "omit")
-# 
-# NDVIdryfocal   <- focal(rstack$NDVI_dry, w5, fun = mean,   na.policy = "omit")
-# NDVIwetfocal   <- focal(rstack$NDVI_wet, w5, fun = mean,   na.policy = "omit")
-# B5wetfocal   <- focal(rstack$B5_wet, w5, fun = mean,   na.policy = "omit")
-# B5dryfocal   <- focal(rstack$B5_dry, w5, fun = mean,   na.policy = "omit")
-# 
-# 
-# names(B11focal) <- c("B11focal")
-# names(B12focal) <- c("B12focal")
-# names(B2focal) <- c("B2focal")
-# names(B3focal) <- c("B3focal")
-# names(B4focal) <- c("B4focal")
-# names(B5focal) <- c("B5focal")
-# names(B6focal) <- c("B6focal")
-# names(B8focal) <- c("B8focal")
-# names(NDVIfocal) <- c("NDVIfocal")
-# names(NDVISDfocal) <- c("NDVISDfocal")
-# names(B4focalSD) <- c("B4focalSD")
-# names(B8focalSD) <- c("B8focalSD")
-# names(NDVIdryfocal) <- c("NDVIdryfocal")
-# names(NDVIwetfocal) <- c("NDVIwetfocal")
-# names(B5wetfocal) <- c("B5wetfocal")
-# names(B5dryfocal) <- c("B5dryfocal")
-# 
-# rstack <- c(rstack, B11focal, B12focal, B2focal, B3focal, B4focal,
-#             B5focal, B6focal, B8focal, NDVIfocal, NDVISDfocal,
-#             B4focalSD, B8focalSD,
-#             NDVIdryfocal, NDVIwetfocal,
-#             B5dryfocal, B5wetfocal)
-# names(rstack)
-# 
-# # remove from environment unwanted standalone rasters
-# rm(B11focal, B12focal, B2focal, B3focal, B4focal,
-#    B5focal, B6focal, B8focal, NDVIfocal, NDVISDfocal,
-#    B4focalSD, B8focalSD, B5dryfocal, B5wetfocal,NDVIdryfocal, NDVIwetfocal)
-# gc()
-# 
-# # save the stack
-# rstack_file <- file.path(stack_folder, "rstack_Aggx2_2023.tif")
-# writeRaster(
-#   rstack,
-#   rstack_file,
-#   overwrite = TRUE,
-#   wopt = list(
-#     datatype = "FLT4S",
-#     gdal = c("COMPRESS=DEFLATE", "TILED=YES",
-#              "BLOCKXSIZE=512", "BLOCKYSIZE=512", "ZLEVEL=9")
-#   )
-# )
+#### Load raster bands ####
+band_files <- list.files(raster_folder, pattern = "*.tif$", full.names = TRUE)
+
+# # Test each file individually
+# bad_files <- c()
+# for (f in band_files) {
+#   cat("Checking:", f, "\n")
+#   tryCatch({
+#     r <- rast(f)
+#     summary(r)  # force some metadata read
+#   }, error = function(e) {
+#     cat(" ❌ Problem with:", f, "\n")
+#     bad_files <<- c(bad_files, f)
+#   })
+# }
+# cat("Bad files detected:\n", bad_files, "\n")
+
+# stack them
+rstack <- rast(band_files)
+rstack <- aggregate(rstack, fact=2)
+cat("Step 2: Loaded raster stack with", nlyr(rstack), "bands\n")
+
+# add focal SD layers
+w5 <- matrix(1,5,5)  # 5x5 window
+w7 <- matrix(1,7,7)  # 5x5 window
+w9 <- matrix(1,9,9)  # 5x5 window
+
+
+B11focal   <- focal(rstack$B11, w5, fun = mean,   na.policy = "omit")
+B12focal   <- focal(rstack$B12, w5, fun = mean,   na.policy = "omit")
+B2focal   <- focal(rstack$B2, w9, fun = mean,   na.policy = "omit")
+B3focal   <- focal(rstack$B3, w5, fun = mean,   na.policy = "omit")
+B4focal   <- focal(rstack$B4, w7, fun = mean,   na.policy = "omit")
+B5focal   <- focal(rstack$B5, w9, fun = mean,   na.policy = "omit")
+B6focal   <- focal(rstack$B6, w7, fun = mean,   na.policy = "omit")
+B8focal   <- focal(rstack$B8, w5, fun = mean,   na.policy = "omit")
+NDVIfocal   <- focal(rstack$NDVI, w5, fun = mean,   na.policy = "omit")
+NDVISDfocal   <- focal(rstack$NDVI_SD, w7, fun = mean,   na.policy = "omit")
+B4focalSD   <- focal(rstack$B4, w9, fun = sd,   na.policy = "omit")
+B8focalSD   <- focal(rstack$B8, w7, fun = sd,   na.policy = "omit")
+
+NDVIdryfocal   <- focal(rstack$NDVI_dry, w5, fun = mean,   na.policy = "omit")
+NDVIwetfocal   <- focal(rstack$NDVI_wet, w5, fun = mean,   na.policy = "omit")
+B5wetfocal   <- focal(rstack$B5_wet, w5, fun = mean,   na.policy = "omit")
+B5dryfocal   <- focal(rstack$B5_dry, w5, fun = mean,   na.policy = "omit")
+
+
+names(B11focal) <- c("B11focal")
+names(B12focal) <- c("B12focal")
+names(B2focal) <- c("B2focal")
+names(B3focal) <- c("B3focal")
+names(B4focal) <- c("B4focal")
+names(B5focal) <- c("B5focal")
+names(B6focal) <- c("B6focal")
+names(B8focal) <- c("B8focal")
+names(NDVIfocal) <- c("NDVIfocal")
+names(NDVISDfocal) <- c("NDVISDfocal")
+names(B4focalSD) <- c("B4focalSD")
+names(B8focalSD) <- c("B8focalSD")
+names(NDVIdryfocal) <- c("NDVIdryfocal")
+names(NDVIwetfocal) <- c("NDVIwetfocal")
+names(B5wetfocal) <- c("B5wetfocal")
+names(B5dryfocal) <- c("B5dryfocal")
+
+rstack <- c(rstack, B11focal, B12focal, B2focal, B3focal, B4focal,
+            B5focal, B6focal, B8focal, NDVIfocal, NDVISDfocal,
+            B4focalSD, B8focalSD,
+            NDVIdryfocal, NDVIwetfocal,
+            B5dryfocal, B5wetfocal)
+names(rstack)
+
+# remove from environment unwanted standalone rasters
+rm(B11focal, B12focal, B2focal, B3focal, B4focal,
+   B5focal, B6focal, B8focal, NDVIfocal, NDVISDfocal,
+   B4focalSD, B8focalSD, B5dryfocal, B5wetfocal,NDVIdryfocal, NDVIwetfocal)
+gc()
+
+# save the stack
+rstack_file <- file.path(stack_folder, "rstack_Aggx2_2021.tif")
+writeRaster(
+  rstack,
+  rstack_file,
+  overwrite = TRUE,
+  wopt = list(
+    datatype = "FLT4S",
+    gdal = c("COMPRESS=DEFLATE", "TILED=YES",
+             "BLOCKXSIZE=512", "BLOCKYSIZE=512", "ZLEVEL=9")
+  )
+)
 
 
 #### Load precomputed stack ####
 myrstack_file <- list.files(stack_folder, pattern = "*.tif$", full.names = TRUE)
 myrstack_file
-specificfile <- myrstack_file[grepl("2023", myrstack_file)]
+specificfile <- myrstack_file[grepl("2021", myrstack_file)]
 rstack <- rast(specificfile)
 names(rstack)
 
@@ -162,7 +165,7 @@ train_polysLL <- do.call(rbind, train_polys_listLL)
 
 # Additional Large Area polygons (LAP)
 classesLAP <- c("bananaLAP", "coffeeLAP", "groundcropsLAP", "grassLAP", "bushLAP",
-               "treesLAP", "forestLAP","buildingLAP","roadLL","waterLAP")
+                "treesLAP", "forestLAP","buildingLAP","roadLL","waterLAP")
 train_polys_listLAP <- list()
 for (i in seq_along(classesLAP)) {
   shp <- st_read(paste0(poly_folder, classesLAP[i], ".shp"))
@@ -174,6 +177,8 @@ train_polysLAP <- do.call(rbind, train_polys_listLAP)
 # i had to put roadLL as a placeholder, but dont want it duplicated so removing those ones now
 train_polysLAP <- train_polysLAP %>%
   filter(class != 8)
+
+
 
 
 # Combine polygons
@@ -222,11 +227,11 @@ set.seed(123)
 km <- kmeans(scale(cent), centers = k)
 centsf$fold <- km$cluster
 
-ggplot(centsf) +
-  geom_sf(aes(color = as.factor(fold)), size = .6, alpha = 0.8) +
-  scale_color_brewer(palette = "Set1", name = "Class") +
-  theme_minimal() +
-  theme(legend.position = "right")
+# ggplot(centsf) +
+#   geom_sf(aes(color = as.factor(fold)), size = .6, alpha = 0.8) +
+#   scale_color_brewer(palette = "Set1", name = "Class") +
+#   theme_minimal() +
+#   theme(legend.position = "right")
 
 centsf <- centsf %>%
   dplyr::select(ID,fold) %>%
@@ -236,25 +241,30 @@ training_datamerge <- training_datamerge %>%
   left_join(centsf)
 
 
-# Sample down dominant class (ground crops, class 2)
-prop.table(table(training_datamerge$class))
-
-class4 <- training_datamerge %>% filter(class == "class4") %>% sample_frac(.7)
-class6 <- training_datamerge %>% filter(class == "class6") %>% sample_frac(.85)
+# Sample down ultra dominant classes (ground crops, bush)
+class4 <- training_datamerge %>% filter(class == "class4") %>% sample_frac(0.7)
+class6 <- training_datamerge %>% filter(class == "class6") %>% sample_frac(0.85)
 others <- training_datamerge %>% filter(!class %in% c("class4","class6"))
 table(others$class)
-training_datamerge2 <- bind_rows(class4, class6, others)
+training_datamerge2 <- bind_rows(class4,class6, others)
+table(training_datamerge2$class)
 prop.table(table(training_datamerge2$class))
-
 cat("Step 5: Resampled dominant classes\n")
+
 
 
 # assess correlation 
 colnames(training_datamerge2)
 cordf <- training_datamerge2 %>%
-  dplyr::select(B11,B12,B2,B3,B4,B5,B6,B7)
+  dplyr::select(B11,B12,B2,B3,B4,B5,B6,B7,B8,B8A, 
+                NDVI_SD,
+                B11focal, B12focal, B2focal, B3focal,
+                B4focal, B5focal, B6focal, B8focal,
+                NDVIfocal, NDVISDfocal,
+                B4focalSD, B8focalSD,
+                NDVIdryfocal, NDVIwetfocal,
+                B5dryfocal, B5wetfocal)
 cordfout <- data.frame(cor(cordf))
-
 write.csv(cordfout, file.path(output_folder, "cordfout.csv"))
 
 
@@ -273,7 +283,6 @@ train_polys <- poly_info %>%
   ungroup()
 
 # 3. split dataset based on polygon membership
-
 train_set <- training_datamerge2 %>% filter(ID %in% train_polys$ID)
 test_set  <- training_datamerge2 %>% filter(!ID %in% train_polys$ID)
 
@@ -297,12 +306,19 @@ indexOut <- lapply(1:k, function(i) which(train_set$fold == i))
 # fit model
 
 # Parallel setup
-n_cores <- 4
+n_cores <- 48
 cl <- makeCluster(n_cores)
 registerDoParallel(cl)
 
 
-X <- train_set %>% dplyr::select(B11,B12,B2,B3,B4,B5,B6,B7)
+X <- train_set %>% dplyr::select(B11,B12,B2,B3,B4,B5,B6,B7,B8,B8A, 
+                                 NDVI_SD,
+                                 B11focal, B12focal, B2focal, B3focal,
+                                 B4focal, B5focal, B6focal, B8focal,
+                                 NDVIfocal, NDVISDfocal,
+                                 B4focalSD, B8focalSD,
+                                 NDVIdryfocal, NDVIwetfocal,
+                                 B5dryfocal, B5wetfocal)
 Y <- as.factor(train_set$class)  # caret handles factor outcomes for multiclass
 str(X)
 str(Y)
@@ -378,12 +394,12 @@ train_ctrl <- trainControl(
 
 # XGBoost tuning grid
 xgb_grid <- expand.grid(
-  nrounds = c(600),        # number of boosting rounds
-  max_depth = c(5),
-  eta = c(.08),          # learning rate
-  gamma = c(0,2),
+  nrounds = c(700,800,900),        # number of boosting rounds
+  max_depth = c(4,5),
+  eta = c(.08,.1,.12),          # learning rate
+  gamma = c(2,4),
   colsample_bytree = c(.6),
-  min_child_weight = c(3),
+  min_child_weight = c(2, 3),
   subsample = c(.5)
 )
 
@@ -405,8 +421,8 @@ stopCluster(cl)
 registerDoSEQ()
 
 
-print(xgb_model$bestTune)  # Best hyperparameters
-print(xgb_model$results)   # CropF1 scores for each hyperparameter combination
+# print(xgb_model$bestTune)  # Best hyperparameters
+# print(xgb_model$results)   # CropF1 scores for each hyperparameter combination
 
 pred <- predict(xgb_model, newdata = train_set)
 table(pred, train_set$class)
@@ -502,7 +518,7 @@ cat("Step 10: Saved confusion matrices\n")
 
 
 
-
+ 
 #### Classify entire raster stack ####
 ##### divide into tiles #####
 library(terra)
@@ -531,9 +547,9 @@ for (i in 1:nrows) {
 for (k in seq_along(tile_extents)) {
   tile <- crop(rstack, tile_extents[[k]])
   out_file <- file.path(output_folder, paste0("rstack_tile", k, ".tif"))
-  
+
   writeRaster(tile, out_file, overwrite = TRUE)
-  
+
   # Clear memory
   rm(tile)
   gc()
@@ -567,14 +583,14 @@ tile_files <- list.files(output_folder, pattern = "^rstack_tile.*\\.tif$", full.
 for (tile_path in tile_files) {
   # Load the tile
   rstack_tile <- rast(tile_path)
-  
+
   # Message to tell what tile I am on
   cat("Classifying:", tile_path, "\n")
   flush.console()
-  
+
   # Build output filename by replacing "rstack_tile" with "classification_2024_tile"
-  out_path <- gsub("rstack_tile", "classification_2024_tile", tile_path)
-  
+  out_path <- gsub("rstack_tile", "classification_tile", tile_path)
+
   # Predict on the tile
   classified_tile <- predict(
     rstack_tile,
@@ -588,7 +604,7 @@ for (tile_path in tile_files) {
                "BLOCKXSIZE=512", "BLOCKYSIZE=512", "ZLEVEL=9")
     )
   )
-  
+
   # Clear memory
   rm(classified_tile, rstack_tile)
   gc()
@@ -601,7 +617,7 @@ library(terra)
 # List classified tile rasters
 classified_files <- list.files(
   output_folder,
-  pattern = "^classification_2024_tile.*\\.tif$",
+  pattern = "^classification_tile.*\\.tif$",
   full.names = TRUE
 )
 
@@ -613,7 +629,7 @@ classified_mosaic <- do.call(mosaic, c(classified_tiles, fun = "first"))
 plot(classified_mosaic)
 
 # Save the final mosaic
-final_file <- file.path(output_folder, "classification_2024_mosaic.tif")
+final_file <- file.path(output_folder, "classification_mosaic.tif")
 writeRaster(
   classified_mosaic,
   final_file,
@@ -628,3 +644,6 @@ writeRaster(
 # Free memory
 rm(classified_tiles, classified_mosaic)
 gc()
+
+
+
